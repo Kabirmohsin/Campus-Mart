@@ -14,65 +14,82 @@ dotenv.config();
 
 const app = express();
 
-// ✅ FIX: Increased payload size limit
+// ✅ Body parsers
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-app.use(cors({
-  origin: 'http://localhost:5173',
-  credentials: true
-}));
+// ✅ Dynamic CORS: Allow both localhost (dev) and Render (prod)
+const allowedOrigins = [
+  'http://localhost:5173', // for local dev
+  'https://campus-mart-frontend.onrender.com' // your Render frontend URL
+];
 
-// Routes
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+  })
+);
+
+// ✅ Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/orders', orderRoutes);
 
-// Health check
+// ✅ Health check
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    success: true, 
+  res.json({
+    success: true,
     message: 'CampusMart Backend is running!',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 });
 
-// ✅ FIX: Add specific error handling for payload too large
+// ✅ Payload too large handler
 app.use((error, req, res, next) => {
   if (error.type === 'entity.too.large') {
     return res.status(413).json({
       success: false,
       message: 'Payload too large',
-      error: 'Request body is larger than the allowed limit (50MB)'
+      error: 'Request body exceeds 50MB limit',
     });
   }
   next(error);
 });
 
-// Error handling middleware
+// ✅ General error handler
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({
     success: false,
     message: 'Something went wrong!',
-    error: process.env.NODE_ENV === 'development' ? err.message : {}
+    error: process.env.NODE_ENV === 'development' ? err.message : {},
   });
 });
 
-// 404 handler
+// ✅ 404 handler
 app.use('*', (req, res) => {
   res.status(404).json({
     success: false,
-    message: 'API endpoint not found'
+    message: 'API endpoint not found',
   });
 });
 
-// MongoDB Connection
+// ✅ MongoDB connection
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGODB_URI);
+    await mongoose.connect(process.env.MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
     console.log('✅ MongoDB Connected Successfully');
   } catch (error) {
     console.error('❌ MongoDB Connection Error:', error);
@@ -82,9 +99,8 @@ const connectDB = async () => {
 
 connectDB();
 
+// ✅ Start server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📊 Environment: ${process.env.NODE_ENV}`);
-  console.log(`🌐 Health check: http://localhost:${PORT}/api/health`);
 });
