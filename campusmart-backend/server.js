@@ -18,24 +18,32 @@ const app = express();
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// ✅ Dynamic CORS: Allow both localhost (dev) and Render (prod)
+// ✅ Allow both localhost (dev) and Render (prod)
 const allowedOrigins = [
-  'http://localhost:5173', // for local dev
-  'https://campus-mart-frontend.onrender.com' // your Render frontend URL
+  'http://localhost:5173',
+  'https://campus-mart-frontend.onrender.com'
 ];
 
+// ✅ Improved CORS: handles missing origin (like server-to-server or Render requests)
 app.use(
   cors({
-    origin: function (origin, callback) {
+    origin: (origin, callback) => {
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
+        console.warn('❌ Blocked by CORS:', origin);
         callback(new Error('Not allowed by CORS'));
       }
     },
     credentials: true,
   })
 );
+
+// ✅ Debug log for requests
+app.use((req, res, next) => {
+  console.log(`🛰️ ${req.method} ${req.url}`);
+  next();
+});
 
 // ✅ Routes
 app.use('/api/auth', authRoutes);
@@ -44,7 +52,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/orders', orderRoutes);
 
-// ✅ Health check
+// ✅ Health check route
 app.get('/api/health', (req, res) => {
   res.json({
     success: true,
@@ -67,11 +75,11 @@ app.use((error, req, res, next) => {
 
 // ✅ General error handler
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error('💥 Server Error:', err.stack);
   res.status(500).json({
     success: false,
     message: 'Something went wrong!',
-    error: process.env.NODE_ENV === 'development' ? err.message : {},
+    error: process.env.NODE_ENV === 'development' ? err.message : undefined,
   });
 });
 
